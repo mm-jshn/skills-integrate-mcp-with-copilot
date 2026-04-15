@@ -3,6 +3,18 @@ document.addEventListener("DOMContentLoaded", () => {
   const activitySelect = document.getElementById("activity");
   const signupForm = document.getElementById("signup-form");
   const messageDiv = document.getElementById("message");
+  let csrfToken = null;
+
+  // Fetch CSRF token from backend
+  async function fetchCsrfToken() {
+    try {
+      const response = await fetch("/csrf-token");
+      const data = await response.json();
+      csrfToken = data.csrf_token;
+    } catch (error) {
+      console.error("Error fetching CSRF token:", error);
+    }
+  }
 
   // Function to fetch activities from API
   async function fetchActivities() {
@@ -67,19 +79,25 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Handle unregister functionality
+  // Handle unregister functionality (CSRF-protected)
   async function handleUnregister(event) {
     const button = event.target;
     const activity = button.getAttribute("data-activity");
     const email = button.getAttribute("data-email");
 
+    // Ensure CSRF token is available
+    if (!csrfToken) await fetchCsrfToken();
+
     try {
+      const formData = new FormData();
+      formData.append("email", email);
+      formData.append("csrf_token", csrfToken);
+
       const response = await fetch(
-        `/activities/${encodeURIComponent(
-          activity
-        )}/unregister?email=${encodeURIComponent(email)}`,
+        `/activities/${encodeURIComponent(activity)}/unregister`,
         {
           method: "DELETE",
+          body: formData,
         }
       );
 
@@ -88,17 +106,14 @@ document.addEventListener("DOMContentLoaded", () => {
       if (response.ok) {
         messageDiv.textContent = result.message;
         messageDiv.className = "success";
-
-        // Refresh activities list to show updated participants
         fetchActivities();
+        await fetchCsrfToken(); // Refresh CSRF token after use
       } else {
         messageDiv.textContent = result.detail || "An error occurred";
         messageDiv.className = "error";
       }
 
       messageDiv.classList.remove("hidden");
-
-      // Hide message after 5 seconds
       setTimeout(() => {
         messageDiv.classList.add("hidden");
       }, 5000);
@@ -110,20 +125,26 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Handle form submission
+  // Handle form submission (CSRF-protected)
   signupForm.addEventListener("submit", async (event) => {
     event.preventDefault();
 
     const email = document.getElementById("email").value;
     const activity = document.getElementById("activity").value;
 
+    // Ensure CSRF token is available
+    if (!csrfToken) await fetchCsrfToken();
+
     try {
+      const formData = new FormData();
+      formData.append("email", email);
+      formData.append("csrf_token", csrfToken);
+
       const response = await fetch(
-        `/activities/${encodeURIComponent(
-          activity
-        )}/signup?email=${encodeURIComponent(email)}`,
+        `/activities/${encodeURIComponent(activity)}/signup`,
         {
           method: "POST",
+          body: formData,
         }
       );
 
@@ -133,17 +154,14 @@ document.addEventListener("DOMContentLoaded", () => {
         messageDiv.textContent = result.message;
         messageDiv.className = "success";
         signupForm.reset();
-
-        // Refresh activities list to show updated participants
         fetchActivities();
+        await fetchCsrfToken(); // Refresh CSRF token after use
       } else {
         messageDiv.textContent = result.detail || "An error occurred";
         messageDiv.className = "error";
       }
 
       messageDiv.classList.remove("hidden");
-
-      // Hide message after 5 seconds
       setTimeout(() => {
         messageDiv.classList.add("hidden");
       }, 5000);
@@ -156,5 +174,8 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // Initialize app
-  fetchActivities();
+  (async () => {
+    await fetchCsrfToken();
+    fetchActivities();
+  })();
 });

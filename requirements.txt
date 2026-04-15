@@ -1,2 +1,5 @@
 fastapi
 uvicorn
+starlette_csrf
+itsdangerous
+python-multipart
